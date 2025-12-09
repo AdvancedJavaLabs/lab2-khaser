@@ -15,12 +15,12 @@ class Broker implements AutoCloseable {
         factory.setHost("localhost");
     }
 
-    TaskChannel getTaskChannel() throws IOException {
-        return new TaskChannel(connection);
+    BrokerQueue<Task> getTaskChannel() throws IOException {
+        return new BrokerQueue<Task>(connection, "task_queue");
     }
 
-    ResultChannel getResultChannel() throws IOException {
-        return new ResultChannel(connection);
+    BrokerQueue<Result> getResultChannel() throws IOException {
+        return new BrokerQueue<Result>(connection, "result_queue");
     }
 
     @Override

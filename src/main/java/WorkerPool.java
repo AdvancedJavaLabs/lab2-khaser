@@ -8,10 +8,10 @@ import java.lang.Thread;
 class WorkerPool {
 
     class Worker implements Runnable {
-        final TaskChannel taskChannel;
-        final ResultChannel resultChannel;
+        final BrokerQueue<Task> taskChannel;
+        final BrokerQueue<Result> resultChannel;
         boolean shouldTerminate = false;
-        Worker(TaskChannel taskChannel, ResultChannel resultChannel) {
+        Worker(BrokerQueue<Task>  taskChannel, BrokerQueue<Result> resultChannel) {
             this.taskChannel = taskChannel;
             this.resultChannel = resultChannel;
         }
@@ -19,7 +19,8 @@ class WorkerPool {
         public void run() {
             DeliverCallback deliverCallback = (consumerTag, delivery) -> {
                 try {
-                    Task recv = Task.fromBytes(delivery.getBody());
+                    var serializer = new ByteSerializer<Task>();
+                    Task recv = serializer.fromBytes(delivery.getBody());
                     // System.out.println(" [x] Received '" + recv.toString() + "'");
                     if (recv.endFlag) {
                         shouldTerminate = true;

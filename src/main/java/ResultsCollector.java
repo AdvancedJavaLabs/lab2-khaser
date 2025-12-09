@@ -7,10 +7,10 @@ class ResultsCollector {
     private Thread collector;
 
     class Worker implements Runnable {
-        ResultChannel resultChannel;
+        BrokerQueue<Result> resultChannel;
         boolean shouldTerminate = false;
 
-        Worker(ResultChannel resultChannel) {
+        Worker(BrokerQueue<Result> resultChannel) {
             this.resultChannel = resultChannel;
         }
 
@@ -18,7 +18,8 @@ class ResultsCollector {
         public void run() {
             DeliverCallback deliverCallback = (consumerTag, delivery) -> {
                 try {
-                    Result recv = Result.fromBytes(delivery.getBody());
+                    var serializer = new ByteSerializer<Result>();
+                    Result recv = serializer.fromBytes(delivery.getBody());
                     // System.out.println(" [x] Received '" + recv.toString() + "'");
                     if (recv.endFlag) {
                         shouldTerminate = true;

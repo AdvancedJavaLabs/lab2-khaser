@@ -16,7 +16,7 @@ class Producer {
 
     void emitTasksForFile(Path path, int nLinesBlockSize) {
         try (Stream<String> stream = Files.lines(path);
-             TaskChannel ch = broker.getTaskChannel()) {
+             var ch = broker.getTaskChannel()) {
             stream.collect(blockCollector(nLinesBlockSize))
                   .forEach((nLines) -> { sendBatch(ch, nLines); });
             ch.send(Task.stopSignal());
@@ -25,7 +25,7 @@ class Producer {
         }
     }
 
-    private void sendBatch(TaskChannel ch, List<String> nLines) {
+    private void sendBatch(BrokerQueue<Task> ch, List<String> nLines) {
         try {
             Task task = new Task(nLines.stream().collect(Collectors.joining()));
             ch.send(task);
