@@ -27,7 +27,7 @@ class Producer {
 
     private void sendBatch(BrokerQueue<Task> ch, List<String> nLines) {
         try {
-            Task task = new Task(nLines.stream().collect(Collectors.joining()));
+            Task task = new Task(nLines.stream().collect(Collectors.joining("\n")));
             ch.send(task);
         } catch (IOException err) {
             System.err.println(err);

@@ -1,10 +1,13 @@
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import com.rabbitmq.client.DeliverCallback;
 
 
 class ResultsCollector {
     private final Result aggregated;
     private Thread collector;
+    private int nextExpectedResult = 1;
 
     class Worker implements Runnable {
         BrokerQueue<Result> resultChannel;
@@ -20,25 +23,32 @@ class ResultsCollector {
                 try {
                     var serializer = new ByteSerializer<Result>();
                     Result recv = serializer.fromBytes(delivery.getBody());
-                    // System.out.println(" [x] Received '" + recv.toString() + "'");
+                    if (recv.id != nextExpectedResult) {
+                        // We got this segment too early, delay it
+                        resultChannel.requeue(delivery.getEnvelope().getDeliveryTag());
+                        return;
+                    }
                     if (recv.endFlag) {
                         shouldTerminate = true;
                         return;
                     }
+
                     resultChannel.ack(delivery.getEnvelope().getDeliveryTag());
+                    nextExpectedResult++;
+                    System.out.println(" [x] Received '" + recv.toString() + "'");
                     aggregated.add(recv);
                 } catch (Exception err) {
                     System.err.println("Exception: " + err);
                 }
             };
-            while (!shouldTerminate) {
-                try {
+            try {
+                while (!shouldTerminate) {
                     resultChannel.receive(deliverCallback);
-                } catch (IOException err) {
-                    System.err.println(err);
                 }
+                resultChannel.close();
+            } catch (Exception err) {
+                System.err.println(err);
             }
-
         }
     }
 

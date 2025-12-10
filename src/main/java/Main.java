@@ -1,9 +1,11 @@
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.nio.file.Path;
 
 public class Main {
     final static Path DUNE_TEXT = Path.of("data", "Herbert Frank - Dune.txt");
     final static int nWorkers = 2;
-    final static int linesInBatch = 64;
+    final static int linesInBatch = 8;
 
     public static void main(String[] args) throws Exception {
 
@@ -16,7 +18,13 @@ public class Main {
              prod.emitTasksForFile(DUNE_TEXT, linesInBatch);
              workers.waitUntilProcessed();
              collector.waitUntilProcessed();
-             System.out.println(collector.getResults().toString());
+             var results = collector.getResults();
+
+             System.out.println(results.toString());
+
+             try (BufferedWriter writer = new BufferedWriter(new FileWriter("modifiedText.txt"))) {
+                 writer.write(results.getModifiedText());
+             }
         }
 
     }

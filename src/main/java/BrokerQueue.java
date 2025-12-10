@@ -28,6 +28,10 @@ class BrokerQueue<T extends Serializable> implements AutoCloseable {
         ch.basicAck(dtag, false);
     }
 
+    void requeue(long dtag) throws IOException {
+        ch.basicReject(dtag, true);
+    }
+
     public void close() throws TimeoutException, IOException {
         ch.close();
     }
