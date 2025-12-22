@@ -1,5 +1,5 @@
 plugins {
-    kotlin("jvm") version "1.9.20"
+    // kotlin("jvm") version "1.9.20"
     application
 }
 
@@ -11,8 +11,7 @@ repositories {
 }
 
 dependencies {
-    implementation("javax.jms:jms-api:2.0.1")
-    implementation("org.apache.activemq:activemq-broker:6.1.1")
+    implementation("com.rabbitmq:amqp-client:5.20.0")
     testImplementation(kotlin("test"))
 }
 
@@ -20,10 +19,6 @@ tasks.test {
     useJUnitPlatform()
 }
 
-kotlin {
-    jvmToolchain(8)
-}
-
 application {
-    mainClass.set("MainKt")
+    mainClass.set("Main")
 }
