@@ -1,5 +1,5 @@
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.HashMap;
 
 import com.rabbitmq.client.DeliverCallback;
 
@@ -10,11 +10,13 @@ class ResultsCollector {
     private int nextExpectedResult = 1;
 
     class Worker implements Runnable {
-        BrokerQueue<Result> resultChannel;
+        final BrokerQueue<Result> resultChannel;
         boolean shouldTerminate = false;
+        final HashMap<Integer, Result> cache;
 
         Worker(BrokerQueue<Result> resultChannel) {
             this.resultChannel = resultChannel;
+            this.cache = new HashMap<>();
         }
 
         @Override
@@ -23,20 +25,19 @@ class ResultsCollector {
                 try {
                     var serializer = new ByteSerializer<Result>();
                     Result recv = serializer.fromBytes(delivery.getBody());
-                    if (recv.id != nextExpectedResult) {
-                        // We got this segment too early, delay it
-                        resultChannel.requeue(delivery.getEnvelope().getDeliveryTag());
-                        return;
-                    }
+                    resultChannel.ack(delivery.getEnvelope().getDeliveryTag());
+                    // System.out.println(" [x] Received '" + recv.toString() + "'");
                     if (recv.endFlag) {
                         shouldTerminate = true;
                         return;
                     }
-
-                    resultChannel.ack(delivery.getEnvelope().getDeliveryTag());
-                    nextExpectedResult++;
-                    System.out.println(" [x] Received '" + recv.toString() + "'");
-                    aggregated.add(recv);
+                    cache.put(recv.id, recv);
+                    while (cache.containsKey(nextExpectedResult)) {
+                        var nextPart = cache.get(nextExpectedResult);
+                        aggregated.add(nextPart);
+                        // System.out.println(" [x] Aggregated '" + nextPart.toString() + "'");
+                        cache.remove(nextExpectedResult++);
+                    }
                 } catch (Exception err) {
                     System.err.println("Exception: " + err);
                 }
