@@ -13,12 +13,16 @@ class Result implements Serializable {
     int negativeWordsCnt;
     boolean endFlag;
     StringBuilder modifiedText;
+    List<String> longestSentences;
+
     private final static HashSet<String> POSITIVE_WORDS =
         new HashSet<>(parseWordList(Main.class.getResourceAsStream("positive_words.txt")));
     private final static HashSet<String> NEGATIVE_WORDS =
         new HashSet<>(parseWordList(Main.class.getResourceAsStream("negative_words.txt")));
 
     private final static String PROPER_NOUN_REPLACEMENT = "CENSORED";
+    private final static int TOP_SENTENCES_COUNT = 10;
+    private final static Pattern SENTENCE_PATTERN = Pattern.compile("[^.!?]+[.!?]");
 
     static ArrayList<String> parseWordList(InputStream is) {
         Scanner scanner = new Scanner(is);
@@ -35,20 +39,26 @@ class Result implements Serializable {
     }
 
     public Result() {
-        this(0, 0, 0, 0, new HashMap<>(), new StringBuilder());
+        this(0, 0, 0, 0, new HashMap<>(), new StringBuilder(), new ArrayList<>());
     }
 
-    private Result(int id, int cntWords, int positiveWordsCnt, int negativeWordsCnt, Map<String, Integer> wordFrequency, StringBuilder modifiedText) {
-        this(id, cntWords, positiveWordsCnt, negativeWordsCnt, wordFrequency, modifiedText, false);
+    private Result(int id, int cntWords, int positiveWordsCnt, int negativeWordsCnt,
+                  Map<String, Integer> wordFrequency, StringBuilder modifiedText,
+                  List<String> longestSentences) {
+        this(id, cntWords, positiveWordsCnt, negativeWordsCnt, wordFrequency,
+             modifiedText, longestSentences, false);
     }
 
-    private Result(int id, int cntWords, int positiveWordsCnt, int negativeWordsCnt, Map<String, Integer> wordFrequency, StringBuilder modifiedText, boolean endFlag) {
+    private Result(int id, int cntWords, int positiveWordsCnt, int negativeWordsCnt,
+                  Map<String, Integer> wordFrequency, StringBuilder modifiedText,
+                  List<String> longestSentences, boolean endFlag) {
         this.id = id;
         this.wordsCnt = cntWords;
         this.positiveWordsCnt = positiveWordsCnt;
         this.negativeWordsCnt = negativeWordsCnt;
         this.modifiedText = modifiedText;
         this.wordFrequency = wordFrequency;
+        this.longestSentences = longestSentences;
         this.endFlag = endFlag;
     }
 
@@ -70,7 +80,33 @@ class Result implements Serializable {
             .map((line) -> replaceProperNouns(line, PROPER_NOUN_REPLACEMENT))
             .collect(Collectors.joining("\n"));
 
-        return new Result(id, wordsCnt, positiveWordsCnt, negativeWordsCnt, frequencyMap, new StringBuilder(modifiedString));
+        List<String> longestSentences = extractLongestSentences(text);
+
+        return new Result(id, wordsCnt, positiveWordsCnt, negativeWordsCnt,
+                         frequencyMap, new StringBuilder(modifiedString),
+                         longestSentences);
+    }
+
+    private static List<String> extractLongestSentences(String text) {
+        if (TOP_SENTENCES_COUNT <= 0 || text == null || text.trim().isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<String> sentences = new ArrayList<>();
+        Matcher matcher = SENTENCE_PATTERN.matcher(text);
+
+        while (matcher.find()) {
+            sentences.add(matcher.group().trim());
+        }
+
+        if (sentences.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        sentences.sort((s1, s2) -> Integer.compare(s2.length(), s1.length()));
+
+        int limit = Math.min(TOP_SENTENCES_COUNT, sentences.size());
+        return new ArrayList<>(sentences.subList(0, limit));
     }
 
     void add(Result oth) {
@@ -79,9 +115,26 @@ class Result implements Serializable {
         negativeWordsCnt += oth.negativeWordsCnt;
         modifiedText.append("\n").append(oth.modifiedText);
 
+        mergeLongestSentences(oth.longestSentences);
+
         for (Map.Entry<String, Integer> entry : oth.wordFrequency.entrySet()) {
             wordFrequency.merge(entry.getKey(), entry.getValue(), Integer::sum);
         }
+    }
+
+    private void mergeLongestSentences(List<String> otherSentences) {
+        if (otherSentences == null || otherSentences.isEmpty()) {
+            return;
+        }
+
+        List<String> allSentences = new ArrayList<>();
+        allSentences.addAll(this.longestSentences);
+        allSentences.addAll(otherSentences);
+
+        allSentences.sort((s1, s2) -> Integer.compare(s2.length(), s1.length()));
+
+        int limit = Math.min(TOP_SENTENCES_COUNT, allSentences.size());
+        this.longestSentences = new ArrayList<>(allSentences.subList(0, limit));
     }
 
     public List<Map.Entry<String, Integer>> getTopFrequentWords(int topN) {
@@ -91,8 +144,12 @@ class Result implements Serializable {
                 .collect(Collectors.toList());
     }
 
+    public List<String> getLongestSentences() {
+        return new ArrayList<>(longestSentences);
+    }
+
     static Result stopSignal(int id) {
-        return new Result(id, 0, 0, 0, null, null, true);
+        return new Result(id, 0, 0, 0, null, null, new ArrayList<>(), true);
     }
 
     @Override
@@ -151,5 +208,4 @@ class Result implements Serializable {
 
         return result.toString();
     }
-
 }
